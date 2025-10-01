@@ -1,0 +1,2 @@
+export * from "../../dist/declarations/src/views/index";
+//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiZmllbGRzLXMzLWltYWdlcy5janMuZC50cyIsInNvdXJjZVJvb3QiOiIiLCJzb3VyY2VzIjpbIi4uLy4uL2Rpc3QvZGVjbGFyYXRpb25zL3NyYy92aWV3cy9pbmRleC5kLnRzIl0sIm5hbWVzIjpbXSwibWFwcGluZ3MiOiJBQUFBIn0=
