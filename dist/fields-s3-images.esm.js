@@ -4,7 +4,8 @@ import { fieldType } from '@keystone-6/core/types';
 import { graphql } from '@keystone-6/core';
 import { n as normalizeImageExtension, p as parseImagesMetaRef, a as parseImageRef, S as SUPPORTED_IMAGE_EXTENSIONS, g as getImageMetaRef, b as getImageRef, i as isValidImageExtension } from './utils-bb2d4e4e.esm.js';
 import { extname } from 'path';
-import AWS from 'aws-sdk';
+import { S3Client, HeadObjectCommand } from '@aws-sdk/client-s3';
+import { Upload } from '@aws-sdk/lib-storage';
 import urlJoin from 'url-join';
 import cuid from 'cuid';
 import sharp from 'sharp';
@@ -46,7 +47,7 @@ async function getDataFromStream(config, upload, context) {
     mimetype
   } = upload;
   const extension = normalizeImageExtension(extname(originalFilename).replace(/^\./, '').toLowerCase());
-  const s3 = new AWS.S3(config.s3Options);
+  const s3Client = new S3Client(config.s3Options);
   const imagePipeline = sharp();
   createReadStream().pipe(imagePipeline);
   const metadata = await imagePipeline.metadata();
@@ -70,17 +71,21 @@ async function getDataFromStream(config, upload, context) {
 
   // upload full image
   const uploadParams = ((_config$uploadParams = config.uploadParams) === null || _config$uploadParams === void 0 ? void 0 : _config$uploadParams.call(config, fileData)) || {};
-  await s3.upload(_objectSpread({
-    Body: createReadStream(),
-    ContentType: mimetype,
-    Bucket: config.bucket,
-    Key: `${config.folder}/${getFilename(fileData)}`,
-    Metadata: {
-      // 'x-amz-meta-original-filename': originalFilename, // disabled per github issue #25
-      'x-amz-meta-image-height': `${metadata.height}`,
-      'x-amz-meta-image-width': `${metadata.width}`
-    }
-  }, uploadParams)).promise();
+  const fullUpload = new Upload({
+    client: s3Client,
+    params: _objectSpread({
+      Body: createReadStream(),
+      ContentType: mimetype,
+      Bucket: config.bucket,
+      Key: `${config.folder}/${getFilename(fileData)}`,
+      Metadata: {
+        // 'x-amz-meta-original-filename': originalFilename, // disabled per github issue #25
+        'x-amz-meta-image-height': `${metadata.height}`,
+        'x-amz-meta-image-width': `${metadata.width}`
+      }
+    }, uploadParams)
+  });
+  await fullUpload.done();
   const sm = (_config$sizes$sm = (_config$sizes = config.sizes) === null || _config$sizes === void 0 ? void 0 : _config$sizes.sm) !== null && _config$sizes$sm !== void 0 ? _config$sizes$sm : 360;
   if (sm) {
     // upload sm image
@@ -96,17 +101,21 @@ async function getDataFromStream(config, upload, context) {
       size: 'sm'
     };
     fileData.sizesMeta.sm = smFileData;
-    await s3.upload(_objectSpread({
-      Body: smFile.data,
-      ContentType: mimetype,
-      Bucket: config.bucket,
-      Key: `${config.folder}/${getFilename(smFileData)}`,
-      Metadata: {
-        // 'x-amz-meta-original-filename': originalFilename, // disabled per github issue #25
-        'x-amz-meta-image-height': `${smFileData.height}`,
-        'x-amz-meta-image-width': `${smFileData.width}`
-      }
-    }, uploadParams)).promise();
+    const smUpload = new Upload({
+      client: s3Client,
+      params: _objectSpread({
+        Body: smFile.data,
+        ContentType: mimetype,
+        Bucket: config.bucket,
+        Key: `${config.folder}/${getFilename(smFileData)}`,
+        Metadata: {
+          // 'x-amz-meta-original-filename': originalFilename, // disabled per github issue #25
+          'x-amz-meta-image-height': `${smFileData.height}`,
+          'x-amz-meta-image-width': `${smFileData.width}`
+        }
+      }, uploadParams)
+    });
+    await smUpload.done();
     // upload md image
   }
   const md = (_config$sizes$md = (_config$sizes2 = config.sizes) === null || _config$sizes2 === void 0 ? void 0 : _config$sizes2.md) !== null && _config$sizes$md !== void 0 ? _config$sizes$md : 720;
@@ -123,17 +132,21 @@ async function getDataFromStream(config, upload, context) {
       size: 'md'
     };
     fileData.sizesMeta.md = mdFileData;
-    await s3.upload(_objectSpread({
-      Body: mdFile.data,
-      ContentType: mimetype,
-      Bucket: config.bucket,
-      Key: `${config.folder}/${getFilename(mdFileData)}`,
-      Metadata: {
-        // 'x-amz-meta-original-filename': originalFilename, // disabled per github issue #25
-        'x-amz-meta-image-height': `${mdFileData.height}`,
-        'x-amz-meta-image-width': `${mdFileData.width}`
-      }
-    }, uploadParams)).promise();
+    const mdUpload = new Upload({
+      client: s3Client,
+      params: _objectSpread({
+        Body: mdFile.data,
+        ContentType: mimetype,
+        Bucket: config.bucket,
+        Key: `${config.folder}/${getFilename(mdFileData)}`,
+        Metadata: {
+          // 'x-amz-meta-original-filename': originalFilename, // disabled per github issue #25
+          'x-amz-meta-image-height': `${mdFileData.height}`,
+          'x-amz-meta-image-width': `${mdFileData.width}`
+        }
+      }, uploadParams)
+    });
+    await mdUpload.done();
   }
   const lg = (_config$sizes$lg = (_config$sizes3 = config.sizes) === null || _config$sizes3 === void 0 ? void 0 : _config$sizes3.lg) !== null && _config$sizes$lg !== void 0 ? _config$sizes$lg : 1280;
   // upload lg image
@@ -150,17 +163,21 @@ async function getDataFromStream(config, upload, context) {
       size: 'lg'
     };
     fileData.sizesMeta.lg = lgFileData;
-    await s3.upload(_objectSpread({
-      Body: lgFile.data,
-      ContentType: mimetype,
-      Bucket: config.bucket,
-      Key: `${config.folder}/${getFilename(lgFileData)}`,
-      Metadata: {
-        // 'x-amz-meta-original-filename': originalFilename, // disabled per github issue #25
-        'x-amz-meta-image-height': `${lgFileData.height}`,
-        'x-amz-meta-image-width': `${lgFileData.width}`
-      }
-    }, uploadParams)).promise();
+    const lgUpload = new Upload({
+      client: s3Client,
+      params: _objectSpread({
+        Body: lgFile.data,
+        ContentType: mimetype,
+        Bucket: config.bucket,
+        Key: `${config.folder}/${getFilename(lgFileData)}`,
+        Metadata: {
+          // 'x-amz-meta-original-filename': originalFilename, // disabled per github issue #25
+          'x-amz-meta-image-height': `${lgFileData.height}`,
+          'x-amz-meta-image-width': `${lgFileData.width}`
+        }
+      }, uploadParams)
+    });
+    await lgUpload.done();
     fileData.sizesMeta.lg = lgFileData;
   }
   if ((_config$sizes4 = config.sizes) !== null && _config$sizes4 !== void 0 && _config$sizes4.base64) {
@@ -190,14 +207,14 @@ async function getDataFromRef(config, ref) {
   if (!fileRef) {
     throw new Error('Invalid image reference');
   }
-  const s3 = new AWS.S3(config.s3Options);
+  const s3Client = new S3Client(config.s3Options);
 
   // get data from S3 for current size
   const sizesMeta = {
-    [fileRef.size]: await getS3ImageMeta(s3, config, fileRef)
+    [fileRef.size]: await getS3ImageMeta(s3Client, config, fileRef)
   };
   for (const size of ['sm', 'md', 'lg', 'full'].filter(item => item !== fileRef.size)) {
-    sizesMeta[size] = await getS3ImageMeta(s3, config, _objectSpread(_objectSpread({}, fileRef), {}, {
+    sizesMeta[size] = await getS3ImageMeta(s3Client, config, _objectSpread(_objectSpread({}, fileRef), {}, {
       size
     }));
   }
@@ -207,12 +224,13 @@ async function getDataFromRef(config, ref) {
     sizesMeta
   });
 }
-async function getS3ImageMeta(s3, config, fileData) {
+async function getS3ImageMeta(s3Client, config, fileData) {
   var _result$Metadata, _result$Metadata2;
-  const result = await s3.headObject({
+  const command = new HeadObjectCommand({
     Bucket: config.bucket,
     Key: urlJoin(config.folder, getFilename(fileData))
-  }).promise();
+  });
+  const result = await s3Client.send(command);
   return _objectSpread(_objectSpread({}, fileData), {}, {
     height: Number(((_result$Metadata = result.Metadata) === null || _result$Metadata === void 0 ? void 0 : _result$Metadata['x-amz-meta-image-height']) || 0),
     width: Number(((_result$Metadata2 = result.Metadata) === null || _result$Metadata2 === void 0 ? void 0 : _result$Metadata2['x-amz-meta-image-width']) || 0),

@@ -1,5 +1,42 @@
 # @k6-contrib/fields-s3-images
 
+## 7.0.0
+
+### Major Changes
+
+- Migrated from AWS SDK v2 to AWS SDK v3 (`@aws-sdk/client-s3` and `@aws-sdk/lib-storage`)
+
+  **Breaking Change:** The `s3Options` configuration format has changed to match AWS SDK v3's `S3ClientConfig`.
+
+  **Before (v6.x with AWS SDK v2):**
+
+  ```typescript
+  s3Options: {
+    accessKeyId: 'YOUR_ACCESS_KEY',
+    secretAccessKey: 'YOUR_SECRET_KEY',
+    endpoint: 's3.amazonaws.com',
+  }
+  ```
+
+  **After (v7.x with AWS SDK v3):**
+
+  ```typescript
+  s3Options: {
+    region: 'us-east-1',
+    credentials: {
+      accessKeyId: 'YOUR_ACCESS_KEY',
+      secretAccessKey: 'YOUR_SECRET_KEY',
+    },
+    // endpoint is optional, only needed for S3-compatible storage
+  }
+  ```
+
+  **Migration steps:**
+
+  1. Wrap `accessKeyId` and `secretAccessKey` in a `credentials` object
+  2. Add `region` if not already specified
+  3. `endpoint` is still supported for S3-compatible storage (MinIO, DigitalOcean Spaces, etc.)
+
 ## 6.1.0
 
 ### Minor Changes

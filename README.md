@@ -7,11 +7,15 @@ import 'dotenv/config';
 const s3sConfig: S3sConfig = {
   bucket: process.env.S3_BUCKET, // name of bucket
   folder: process.env.S3_PATH,
-  baseUrl: process.env.S3_BASE_URL, // if provided the url is not compouted from endpoint and folder, rather use this as `${baseUrl}/${filename}`
+  baseUrl: process.env.S3_BASE_URL, // if provided the url is not computed from endpoint and folder, rather use this as `${baseUrl}/${filename}`
   s3Options: {
-    accessKeyId: process.env.S3_ACCESS_KEY_ID,
-    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
-    endpoint: process.env.S3_ENDPOINT, // use region for aws, endpoint for s3 compatible storage
+    region: process.env.S3_REGION, // AWS region (e.g., 'us-east-1', 'ap-southeast-2')
+    credentials: {
+      accessKeyId: process.env.S3_ACCESS_KEY_ID,
+      secretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
+    },
+    // For S3-compatible storage (MinIO, DigitalOcean Spaces, etc.), also specify:
+    // endpoint: process.env.S3_ENDPOINT,
   },
   sizes: {
     sm: 360,

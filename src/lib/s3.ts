@@ -1,6 +1,7 @@
 import { extname } from 'path';
 import { FileUpload } from 'graphql-upload';
-import AWS from 'aws-sdk';
+import { S3Client, HeadObjectCommand } from '@aws-sdk/client-s3';
+import { Upload } from '@aws-sdk/lib-storage';
 import urlJoin from 'url-join';
 import cuid from 'cuid';
 import sharp from 'sharp';
@@ -39,7 +40,7 @@ export async function getDataFromStream(
   const extension = normalizeImageExtension(
     extname(originalFilename).replace(/^\./, '').toLowerCase()
   );
-  const s3 = new AWS.S3(config.s3Options);
+  const s3Client = new S3Client(config.s3Options);
 
   const imagePipeline = sharp();
   createReadStream().pipe(imagePipeline);
@@ -59,8 +60,9 @@ export async function getDataFromStream(
 
   // upload full image
   const uploadParams = config.uploadParams?.(fileData) || {};
-  await s3
-    .upload({
+  const fullUpload = new Upload({
+    client: s3Client,
+    params: {
       Body: createReadStream(),
       ContentType: mimetype,
       Bucket: config.bucket,
@@ -71,8 +73,9 @@ export async function getDataFromStream(
         'x-amz-meta-image-width': `${metadata.width}`,
       },
       ...uploadParams,
-    })
-    .promise();
+    },
+  });
+  await fullUpload.done();
   const sm = config.sizes?.sm ?? 360;
   if (sm) {
     // upload sm image
@@ -87,8 +90,9 @@ export async function getDataFromStream(
     };
     fileData.sizesMeta.sm = smFileData;
 
-    await s3
-      .upload({
+    const smUpload = new Upload({
+      client: s3Client,
+      params: {
         Body: smFile.data,
         ContentType: mimetype,
         Bucket: config.bucket,
@@ -99,8 +103,9 @@ export async function getDataFromStream(
           'x-amz-meta-image-width': `${smFileData.width}`,
         },
         ...uploadParams,
-      })
-      .promise();
+      },
+    });
+    await smUpload.done();
     // upload md image
   }
 
@@ -117,8 +122,9 @@ export async function getDataFromStream(
     };
     fileData.sizesMeta.md = mdFileData;
 
-    await s3
-      .upload({
+    const mdUpload = new Upload({
+      client: s3Client,
+      params: {
         Body: mdFile.data,
         ContentType: mimetype,
         Bucket: config.bucket,
@@ -129,8 +135,9 @@ export async function getDataFromStream(
           'x-amz-meta-image-width': `${mdFileData.width}`,
         },
         ...uploadParams,
-      })
-      .promise();
+      },
+    });
+    await mdUpload.done();
   }
 
   const lg = config.sizes?.lg ?? 1280;
@@ -147,8 +154,9 @@ export async function getDataFromStream(
     };
     fileData.sizesMeta.lg = lgFileData;
 
-    await s3
-      .upload({
+    const lgUpload = new Upload({
+      client: s3Client,
+      params: {
         Body: lgFile.data,
         ContentType: mimetype,
         Bucket: config.bucket,
@@ -159,8 +167,9 @@ export async function getDataFromStream(
           'x-amz-meta-image-width': `${lgFileData.width}`,
         },
         ...uploadParams,
-      })
-      .promise();
+      },
+    });
+    await lgUpload.done();
     fileData.sizesMeta.lg = lgFileData;
   }
   if (config.sizes?.base64) {
@@ -201,15 +210,15 @@ export async function getDataFromRef(
     throw new Error('Invalid image reference');
   }
 
-  const s3 = new AWS.S3(config.s3Options);
+  const s3Client = new S3Client(config.s3Options);
 
   // get data from S3 for current size
   const sizesMeta = {
-    [fileRef.size]: await getS3ImageMeta(s3, config, fileRef as ImagesData),
+    [fileRef.size]: await getS3ImageMeta(s3Client, config, fileRef as ImagesData),
   };
 
   for (const size of ['sm', 'md', 'lg', 'full'].filter(item => item !== fileRef.size)) {
-    sizesMeta[size] = await getS3ImageMeta(s3, config, { ...fileRef, size } as ImagesData);
+    sizesMeta[size] = await getS3ImageMeta(s3Client, config, { ...fileRef, size } as ImagesData);
   }
 
   const { size, ...imageData } = sizesMeta.full;
@@ -219,13 +228,12 @@ export async function getDataFromRef(
   };
 }
 
-async function getS3ImageMeta(s3: AWS.S3, config: S3ImagesConfig, fileData: ImagesData) {
-  const result = await s3
-    .headObject({
-      Bucket: config.bucket,
-      Key: urlJoin(config.folder as string, getFilename(fileData)),
-    })
-    .promise();
+async function getS3ImageMeta(s3Client: S3Client, config: S3ImagesConfig, fileData: ImagesData) {
+  const command = new HeadObjectCommand({
+    Bucket: config.bucket,
+    Key: urlJoin(config.folder as string, getFilename(fileData)),
+  });
+  const result = await s3Client.send(command);
   return {
     ...fileData,
     height: Number(result.Metadata?.['x-amz-meta-image-height'] || 0),
